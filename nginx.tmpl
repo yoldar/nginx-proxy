@@ -293,8 +293,8 @@ server {
 	ssl_dhparam {{ printf "/etc/nginx/certs/%s.dhparam.pem" $cert }};
 	{{ end }}
 
-        {{ if (exists (printf "/etc/nginx/ca/%s.pem" $host)) }}
-        ssl_client_certificate {{ (printf "/etc/nginx/ca/%s.pem" $host) }};
+        {{ if (exists (printf "/etc/nginx/ca/%s.crt" $host)) }}
+        ssl_client_certificate {{ (printf "/etc/nginx/ca/%s.crt" $host) }};
         ssl_verify_client on;
         {{ end }}
 
