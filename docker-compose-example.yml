@@ -1,0 +1,38 @@
+services:
+  nginx-proxy:
+    image: yoldarz/nginx-proxy:1.6.3
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ca:/etc/nginx/ca:ro
+      - certs:/etc/nginx/certs
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      - main
+
+  nginx-proxy-acme-companion:
+    image: nginxproxy/acme-companion:2.5.0
+    container_name: nginx-proxy-acme-companion
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - acme:/etc/acme.sh
+    environment:
+      - DEFAULT_EMAIL=eldar.zakiryanov@gmail.com
+    depends_on:
+      - nginx-proxy
+    volumes_from:
+      - nginx-proxy
+    networks:
+      - main
+
+volumes:
+  certs:
+  html:
+  acme:
+
+networks:
+  main:
+    external: true

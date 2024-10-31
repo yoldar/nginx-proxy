@@ -324,7 +324,7 @@ upstream {{ $vpath.upstream }} {
             {{- template "container_port" $args }}
             {{- if $ip }}
                 {{- $servers = add1 $servers }}
-    server {{ $ip }}:{{ $args.port }};
+    server {{ $ip }}:{{ $args.port }} max_fails=0;
             {{- end }}
         {{- end }}
     {{- end }}
@@ -421,7 +421,7 @@ gzip_types text/plain text/css application/javascript application/json applicati
      * LOG_FORMAT        sets the log format
      */}}
 {{- $logEscape := printf "escape=%s" (or $globals.Env.LOG_FORMAT_ESCAPE "default") }}
-{{- $logFormat := or $globals.Env.LOG_FORMAT `$host $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$upstream_addr"` }}
+{{- $logFormat := or $globals.Env.LOG_FORMAT `$host $remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent $request_time "$http_referer" "$http_user_agent" "$upstream_addr"` }}
 
 {{- if parseBool (or $globals.Env.LOG_JSON "false") }}
     {{- /* LOG_JSON is a shorthand
@@ -451,7 +451,7 @@ access_log off;
 {{- end }}
 
 {{- template "ssl_policy" (dict "ssl_policy" $httpContextSslPolicy) }}
-error_log /dev/stderr;
+error_log /var/log/nginx/error.log warn;
 
 {{- if $globals.Env.RESOLVERS }}
 resolver {{ $globals.Env.RESOLVERS }};
@@ -837,6 +837,11 @@ server {
             {{- if (exists (printf "/etc/nginx/certs/%s.dhparam.pem" $vhost.cert)) }}
     ssl_dhparam {{ printf "/etc/nginx/certs/%s.dhparam.pem" $vhost.cert }};
             {{- end }}
+
+            {{ if (exists (printf "/etc/nginx/ca/%s.crt" $hostname)) }}
+    ssl_client_certificate {{ (printf "/etc/nginx/ca/%s.crt " $hostname) }};
+    ssl_verify_client on;
+            {{ end }}
 
             {{- if (exists (printf "/etc/nginx/certs/%s.chain.pem" $vhost.cert)) }}
     ssl_stapling on;
