@@ -843,6 +843,10 @@ server {
     ssl_verify_client on;
             {{ end }}
 
+            {{ if (exists (printf "/etc/nginx/ca/%s.crl" $hostname)) }}
+    ssl_crl {{ (printf "/etc/nginx/ca/%s.crl " $hostname) }};
+            {{ end }}
+
             {{- if (exists (printf "/etc/nginx/certs/%s.chain.pem" $vhost.cert)) }}
     ssl_stapling on;
     ssl_stapling_verify on;
