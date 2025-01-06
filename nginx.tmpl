@@ -854,11 +854,7 @@ server {
             {{- end }}
 
             {{- if (not (or (eq $vhost.https_method "noredirect") (eq $vhost.hsts "off"))) }}
-    set $sts_header "";
-    if ($https) {
-        set $sts_header "{{ trim $vhost.hsts }}";
-    }
-    add_header Strict-Transport-Security $sts_header always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
             {{- end }}
         {{- else if $globals.default_cert_ok }}
     # No certificate found for this vhost, so use the default certificate and
