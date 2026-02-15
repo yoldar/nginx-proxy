@@ -1,6 +1,7 @@
 services:
   nginx-proxy:
-    image: yoldarz/nginx-proxy:1.6.3
+    image: yoldarz/nginx-proxy:1.27.2-vouch-proxy
+    restart: unless-stopped
     container_name: nginx-proxy
     ports:
       - "80:80"
@@ -15,12 +16,11 @@ services:
 
   nginx-proxy-acme-companion:
     image: nginxproxy/acme-companion:2.5.0
+    restart: unless-stopped
     container_name: nginx-proxy-acme-companion
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - acme:/etc/acme.sh
-    environment:
-      - DEFAULT_EMAIL=eldar.zakiryanov@gmail.com
     depends_on:
       - nginx-proxy
     volumes_from:
@@ -28,10 +28,37 @@ services:
     networks:
       - main
 
+  vouch-proxy:
+    image: quay.io/vouch/vouch-proxy:0.45.0
+    restart: unless-stopped
+    container_name: vouch-proxy
+    volumes:
+      - vouch-config-data:/config
+    enviroment:
+      - VOUCH_ALLOWALLUSERS=true
+      - VOUCH_COOKIE_DOMAIN=mydomain.com
+      - VOUCH_SESSION_KEY=***
+      - OAUTH_PROVIDER=azure
+      - OAUTH_CLIENT_ID=********-****-****-****-***************
+      - OAUTH_CLIENT_SECRET=**********
+      - OAUTH_AUTH_URL=https://login.microsoftonline.com/********-****-****-****-***************/oauth2/v2.0/authorize
+      - OAUTH_TOKEN_URL=https://login.microsoftonline.com/********-****-****-****-***************/oauth2/v2.0/token
+      - OAUTH_USER_INFO_URL=https://graph.microsoft.com/oidc/userinfo
+      - OAUTH_SCOPES=openid,profile,email
+      - OAUTH_CALLBACK_URL=https://vouch.mydomain.com/auth
+      - OAUTH_AZURE_TOKEN=id_token
+      - VIRTUAL_HOST=vouch.mydomain.com
+      - VIRTUAL_PORT=9090
+      - LETSENCRYPT_HOST=vouch.mydomain.com
+      - VOUCH_LOGLEVEL=debug
+    networks:
+      - main
+
 volumes:
   certs:
   html:
   acme:
+  vouch-config-data:
 
 networks:
   main:

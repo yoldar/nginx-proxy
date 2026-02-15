@@ -639,6 +639,12 @@ proxy_set_header Proxy "";
     {{- /* Get the VIRTUAL_ROOT By containers w/ use fastcgi root */}}
     {{- $vhost_root := or (first (groupByKeys $vhost_containers "Env.VIRTUAL_ROOT")) "/var/www/public" }}
 
+    {{- /* Get the VOUCH_PRIVATE_URL defined by containers w/ the same vhost, falling back to empty string (use default) */}}
+    {{- $vouch_private_url := or (first (groupByKeys $vhost_containers "Env.VOUCH_PRIVATE_URL")) "" }}
+
+    {{- /* Get the VOUCH_PUBLIC_URL defined by containers w/ the same vhost, falling back to empty string (use default) */}}
+    {{- $vouch_public_url := or (first (groupByKeys $vhost_containers "Env.VOUCH_PUBLIC_URL")) "" }}
+
     {{- $vhost_data = merge $vhost_data (dict
         "cert" $cert
         "cert_ok" $cert_ok
@@ -652,6 +658,8 @@ proxy_set_header Proxy "";
         "server_tokens" $server_tokens
         "ssl_policy" $ssl_policy
         "vhost_root" $vhost_root
+        "vouch_private_url" $vouch_private_url
+        "vouch_public_url" $vouch_public_url
     ) }}
     {{- $_ := set $globals.vhosts $hostname $vhost_data }}
 {{- end }}
@@ -875,6 +883,37 @@ server {
     {{- else if (exists "/etc/nginx/vhost.d/default") }}
     include /etc/nginx/vhost.d/default;
     {{- end }}
+
+    {{ if (and (ne $vhost.vouch_private_url "") (ne $vhost.vouch_public_url "")) }}
+    auth_request /vouchValidate;
+
+    location = /vouchValidate {
+        # forward the /validate request to Vouch Proxy
+        proxy_pass {{ $vhost.vouch_private_url }}/validate;
+        # be sure to pass the original host header
+        proxy_set_header Host $http_host;
+
+        # Vouch Proxy only acts on the request headers
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+
+        # optionally add X-Vouch-User as returned by Vouch Proxy along with the request
+        auth_request_set $auth_resp_x_vouch_user $upstream_http_x_vouch_user;
+
+        # these return values are used by the @error401 call
+        auth_request_set $auth_resp_jwt $upstream_http_x_vouch_jwt;
+        auth_request_set $auth_resp_err $upstream_http_x_vouch_err;
+        auth_request_set $auth_resp_failcount $upstream_http_x_vouch_failcount;
+    }
+
+    # if validate returns `401 not authorized` then forward the request to the error401block
+    error_page 401 = @error401;
+
+    location @error401 {
+        # redirect to Vouch Proxy for login
+        return 302 {{ $vhost.vouch_public_url }}/login?url=$scheme://$http_host$request_uri&vouch-failcount=$auth_resp_failcount&X-Vouch-Token=$auth_resp_jwt&error=$auth_resp_err;
+    }
+    {{ end }}
 
     {{- range $path, $vpath := $vhost.paths }}
         {{- template "location" (dict
