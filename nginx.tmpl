@@ -890,8 +890,11 @@ server {
     location = /vouchValidate {
         # forward the /validate request to Vouch Proxy
         proxy_pass {{ $vhost.vouch_private_url }}/validate;
-        # be sure to pass the original host header
-        proxy_set_header Host $http_host;
+        
+        # отправлять корректный SNI, когда private_url по https
+        proxy_ssl_server_name on;
+        # хост vouch, а не защищаемого приложения (берём из самого URL)
+        proxy_set_header Host {{ $vhost.vouch_private_url | trimPrefix "https://" | trimPrefix "http://" }};
 
         # Vouch Proxy only acts on the request headers
         proxy_pass_request_body off;
