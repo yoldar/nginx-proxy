@@ -377,7 +377,9 @@ If you want access logs in JSON format, you can set `LOG_JSON=true`. This will c
   "upstream_addr": "$upstream_addr",
   "http_referrer": "$http_referer",
   "http_user_agent": "$http_user_agent",
-  "request_id": "$request_id"
+  "request_id": "$request_id",
+  "uid": "$http_x_user_uid",
+  "imp": "$http_x_impersonate_slack_id"
 }
 ```
 

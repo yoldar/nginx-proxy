@@ -432,7 +432,7 @@ gzip_types text/plain text/css application/javascript application/json applicati
         */}}
 # JSON Logging enabled (via LOG_JSON env variable)
     {{- $logEscape = printf "escape=%s" (or $globals.Env.LOG_FORMAT_ESCAPE "json") }}
-    {{- $logFormat = or $globals.Env.LOG_FORMAT `{"time_local":"$time_iso8601","client_ip":"$http_x_forwarded_for","remote_addr":"$remote_addr","request":"$request","status":"$status","body_bytes_sent":"$body_bytes_sent","request_time":"$request_time","upstream_response_time":"$upstream_response_time","upstream_addr":"$upstream_addr","http_referrer":"$http_referer","http_user_agent":"$http_user_agent","request_id":"$request_id"}` }}
+    {{- $logFormat = or $globals.Env.LOG_FORMAT `{"time_local":"$time_iso8601","client_ip":"$http_x_forwarded_for","remote_addr":"$remote_addr","request":"$request","status":"$status","body_bytes_sent":"$body_bytes_sent","request_time":"$request_time","upstream_response_time":"$upstream_response_time","upstream_addr":"$upstream_addr","http_referrer":"$http_referer","http_user_agent":"$http_user_agent","request_id":"$request_id","uid":"$http_x_user_uid","imp":"$http_x_impersonate_slack_id"}` }}
 {{- end }}
 
 log_format vhost {{ $logEscape }} '{{ or $globals.Env.LOG_FORMAT $logFormat }}';
