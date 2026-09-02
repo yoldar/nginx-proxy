@@ -40,6 +40,17 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "
 
 Log-format tests live in `test/test_logs/`; `test_log_json.py` asserts a prefix of the JSON line, so appending new keys at the end of the format is test-safe.
 
+## Status & open items (as of 2026-09-02)
+
+Done recently (see git log): `uid`/`imp` added to JSON log format; `http_referrer` removed from it (JWT leaked via `?token=` in Referer).
+
+Open items, discussed but deliberately not done yet:
+
+- **Production image not rebuilt/pushed** since the log-format changes — run `./docker-build.sh` and redeploy for them to take effect in prod.
+- `$http_referer` is still in the **non-JSON** default format (`nginx.tmpl` ~line 427). Left as-is because prod uses `LOG_JSON=true`; remove it too if consistency is wanted.
+- The `request` JSON field logs the full URL including query string — a direct request to `/page?token=...` would still leak the token into logs. Mitigation would be logging a query-stripped variant via a `map` block (pattern: `nginx.tmpl` ~lines 352–420); not implemented, owner undecided.
+- Root cause lives in the app, not the proxy: `app.rekassa.kz` puts a Firebase JWT in the `?token=` URL query param. Proper fix is app-side (stop passing tokens in URLs; consider a `Referrer-Policy` header).
+
 ## Conventions
 
 - Commit messages: conventional-commit style (`feat:`, `fix:`, `refactor:`), imperative subject.
