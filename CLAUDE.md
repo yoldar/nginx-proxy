@@ -36,7 +36,23 @@ gh run list -R yoldar/nginx-proxy -w Tests -L 3
 gh run view <run-id> -R yoldar/nginx-proxy --log-failed
 ```
 
-Only run locally if the user explicitly confirms after being told all their containers will be destroyed, or inside an isolated Docker daemon (e.g. a `docker:dind` container).
+Local run, safely isolated in a throwaway docker-in-docker daemon (the suite only sees containers inside `np-dind`; ~12 min for the full suite, or pass a path like `test_logs/` as the last arg):
+
+```bash
+REPO=$PWD   # repo root
+docker build --build-arg NGINX_PROXY_VERSION=test -f Dockerfile.alpine -t nginxproxy/nginx-proxy:test .
+docker build -t web test/requirements/web
+docker build -t nginx-proxy-tester -f test/requirements/Dockerfile-nginx-proxy-tester test/requirements
+docker run -d --privileged --name np-dind -e DOCKER_TLS_CERTDIR= -v $REPO:$REPO docker:28-dind
+until docker exec np-dind docker info >/dev/null 2>&1; do sleep 1; done
+docker save web nginxproxy/nginx-proxy:test nginx-proxy-tester | docker exec -i np-dind docker load
+docker exec np-dind docker run --rm --name nginx-proxy-pytest -v /var/run/docker.sock:/var/run/docker.sock -v $REPO:$REPO -w $REPO/test nginx-proxy-tester
+docker rm -f -v np-dind
+```
+
+Never run the tester against the host's `/var/run/docker.sock` directly.
+
+**Known baseline failures** (identical on nginx 1.27.2 and 1.31.9, alpine and debian — caused by fork changes, not regressions): 17 tests — `test_server_tokens_on` ×2 (fork forces `server_tokens off`), HSTS ×7 (commit `06a8288` dropped the `Strict-Transport-Security` header), `test_dhparam.py` ×6, `test_multiple-networks.py::test_multipath`, `test_VIRTUAL_PORT-single-different-from-single-port`. Compare new failures against this list. Extra in dind only: `test_host-network-mode/*` and `test_raw-ip-vhost.py` error at setup (host networking / IPv6 unsupported in dind); `test_multiports-invalid-syntax` is flaky.
 
 Log-format tests live in `test/test_logs/`; `test_log_json.py` asserts a prefix of the JSON line, so appending new keys at the end of the format is test-safe.
 
