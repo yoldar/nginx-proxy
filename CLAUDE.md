@@ -24,29 +24,31 @@ Fork of [nginx-proxy/nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) �
 
 ## Testing
 
-Tests are pytest-based and drive real Docker containers (need Docker running).
+Tests are pytest-based and drive real Docker containers.
+
+> **DANGER — do not run the test suite against the developer's local Docker.** `test/conftest.py` (`remove_all_containers()`, called at the start of *every* test module via `DockerComposer.compose`) force-removes **every container on the Docker host**, with volumes, sparing only a container named `nginx-proxy-pytest`. This applies to `make test-*`, `test/pytest.sh`, and running any single test module. Without `--name nginx-proxy-pytest` the tester container deletes itself instead (exit 137) after possibly deleting others. Upstream designed this for disposable CI runners.
+
+Run tests in GitHub Actions instead (disposable runners, both alpine and debian images):
 
 ```bash
-make test-alpine        # full suite: builds web test image + proxy test image, runs everything (slow)
+gh workflow run test.yml -R yoldar/nginx-proxy --ref vouch-proxy   # push the branch first
+gh run list -R yoldar/nginx-proxy -w Tests -L 3
+gh run view <run-id> -R yoldar/nginx-proxy --log-failed
 ```
 
-Run a subset non-interactively (the stock `test/pytest.sh` uses `-it` and must be run from the repo root; the direct equivalent):
-
-```bash
-docker build --build-arg NGINX_PROXY_VERSION="test" -f Dockerfile.alpine -t nginxproxy/nginx-proxy:test .
-docker build --pull -t nginx-proxy-tester -f test/requirements/Dockerfile-nginx-proxy-tester test/requirements
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:$PWD" -w "$PWD/test" nginx-proxy-tester test_logs/
-```
+Only run locally if the user explicitly confirms after being told all their containers will be destroyed, or inside an isolated Docker daemon (e.g. a `docker:dind` container).
 
 Log-format tests live in `test/test_logs/`; `test_log_json.py` asserts a prefix of the JSON line, so appending new keys at the end of the format is test-safe.
 
-## Status & open items (as of 2026-09-02)
+## Status & open items (as of 2026-11-24)
 
-Done recently (see git log): `uid`/`imp` added to JSON log format; `http_referrer` removed from it (JWT leaked via `?token=` in Referer).
+Done recently (see git log): `uid`/`imp` added to JSON log format; `http_referrer` removed from it (JWT leaked via `?token=` in Referer); **nginx bumped 1.27.2 → 1.31.9** to fix NGINX2Root (CVE-2026-123007 HTTP/2 RCE, CVE-2026-123633, CVE-2026-121810, CVE-2026-123634, CVE-2026-113425 — fixed in nginx 1.31.9+ / 1.30.7+ per nginx.org/en/security_advisories.html). HTTP/2 is on by default in this template, so the RCE applies; never go below 1.31.9 / 1.30.7.
+
+Upstream nginx-proxy (`github.com/nginx-proxy/nginx-proxy`, not configured as a git remote) was still on nginx 1.31.6 (vulnerable) at that time — check its base image before syncing from it. This fork also lags upstream on docker-gen (0.14.2 vs 0.17.2) and forego.
 
 Open items, discussed but deliberately not done yet:
 
-- **Production image not rebuilt/pushed** since the log-format changes — run `./docker-build.sh` and redeploy for them to take effect in prod.
+- **Production image not rebuilt/pushed** since the log-format changes and the nginx 1.31.9 bump — run `./docker-build.sh` (default tag now `1.31.9-vouch-proxy`), update the image tag in the prod compose file, and **restart** (not reload) the proxy container. Verify with `docker exec <proxy> nginx -v`.
 - `$http_referer` is still in the **non-JSON** default format (`nginx.tmpl` ~line 427). Left as-is because prod uses `LOG_JSON=true`; remove it too if consistency is wanted.
 - The `request` JSON field logs the full URL including query string — a direct request to `/page?token=...` would still leak the token into logs. Mitigation would be logging a query-stripped variant via a `map` block (pattern: `nginx.tmpl` ~lines 352–420); not implemented, owner undecided.
 - Root cause lives in the app, not the proxy: `app.rekassa.kz` puts a Firebase JWT in the `?token=` URL query param. Proper fix is app-side (stop passing tokens in URLs; consider a `Referrer-Policy` header).

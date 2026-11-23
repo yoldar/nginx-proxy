@@ -2,7 +2,7 @@
 
 TAG=$1
 if [ -z "$TAG" ]; then
-	TAG=1.27.2-vouch-proxy
+	TAG=1.31.9-vouch-proxy
 fi
 
 BASEDIR=`pwd`
